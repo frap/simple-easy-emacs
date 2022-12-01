@@ -2,3 +2,7 @@
 /straight/
 /recentf
 /history
+/auto-save*
+/eln-cache
+/places
+/transient
