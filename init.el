@@ -19,7 +19,7 @@
 
 (defvar bootstrap-version)
 (let ((bootstrap-file
-       (expand-file-name "straight/repos/straight.el/bootstrap.el" user-emacs-directory))
+       (expand-file-name "straight/repos/straight.el/bootstrap.el" EMACS_CACHE/ ))
       (bootstrap-version 6))
   (unless (file-exists-p bootstrap-file)
     (with-current-buffer
@@ -43,9 +43,10 @@
         ("org" . "https://orgmode.org/elpa/")
         ("elpa" . "https://elpa.gnu.org/packages/")))
 
+;; BETTER DEFAULTS
 (use-package emacs
   :config
-  (load-theme 'modus-vivendi)
+  (load-theme 'modus-operandi)
   (defun crm-indicator (args)
     (cons (format "[CRM%s] %s"
 		  (replace-regexp-in-string
@@ -102,12 +103,154 @@
   (global-so-long-mode 1)
   :bind ("<f5>" . modus-themes-toggle))
 
+;; UNBIND ANNOYANCES
+
+(global-unset-key (kbd "C-z"))
+(global-unset-key (kbd "C-x C-z"))
+(global-unset-key (kbd "M-m"))
+
+;; TAB AUTO COMPLETION
+(setq tab-always-indent 'complete) ; used by eglot for auto-completion as well
+
+;; BETTER-DEFAULTS
+
+(global-set-key (kbd "C-x C-b") 'ibuffer)
+(global-set-key (kbd "M-/") 'hippie-expand)
+
+;; MATCHING BRACKET LIKE VIM's "%"
+
+(defun forward-or-backward-sexp (&optional arg)
+  "Go to the matching parenthesis character if one is adjacent to point."
+  (interactive "^p")
+  (cond ((looking-at "\\s(") (forward-sexp arg))
+        ((looking-back "\\s)" 1) (backward-sexp arg))
+        ;; Now, try to succeed from inside of a bracket
+        ((looking-at "\\s)") (forward-char) (backward-sexp arg))
+        ((looking-back "\\s(" 1) (backward-char) (forward-sexp arg))))
+
+(global-set-key (kbd "C-%") 'forward-or-backward-sexp)
+
+;; COLLECTION OF REDICULOUSLY USEFUL EXTENSIONS
+
+(global-set-key (kbd "C-c i") #'(lambda ()
+                                  (interactive)
+                                  (find-file user-init-file)))
+
+(defun spartan-crux-hook ()
+  (use-package crux))
+
+(add-hook 'after-init-hook 'spartan-crux-hook)
+
+(with-eval-after-load 'crux
+  (global-set-key (kbd "C-a") 'crux-move-beginning-of-line)
+  (global-set-key (kbd "C-o") 'crux-smart-open-line)
+  (global-set-key (kbd "C-c C-l") 'crux-duplicate-current-line-or-region)
+  (global-set-key (kbd "C-c C--") 'crux-kill-whole-line)
+  (global-set-key (kbd "C-c ;") 'crux-duplicate-and-comment-current-line-or-region))
+
+;; BROWSE KILL RING
+
+(with-eval-after-load 'browse-kill-ring
+  (global-set-key (kbd "M-y") 'browse-kill-ring))
+
+;; REGEXP SEARCH
+
+(global-set-key (kbd "C-s") 'isearch-forward-regexp)
+(global-set-key (kbd "C-M-s") 'isearch-forward)
+(global-set-key (kbd "C-r") 'isearch-backward-regexp)
+(global-set-key (kbd "C-M-r") 'isearch-backward)
+
+;; FIND FILES
+
+(defalias 'ff 'find-name-dired)
+
+;; GREP FILES
+
+(defalias 'rg 'rgrep)
+
+;; DIFF
+
+(defalias 'ed 'ediff)
+(defalias 'edb 'ediff-buffers)
+
+;; GIT
+
+(with-eval-after-load 'magit
+  (defalias 'git 'magit))
+
+;; LINTER
+
+(with-eval-after-load 'flymake
+  (defun spartan-lint ()
+    (interactive)
+    (flymake-mode 1)
+    (flymake-show-diagnostics-buffer))
+  (defalias 'lint 'spartan-lint))
+
+;; Explicitly set an Emacs environment as desired.
+;; NO MORE editing .bash_profile or whatever or messing with packages like `exec-path-from-shell' !
+
+(require 'subr-x)
+
+;; if EDITOR is not set already, set it.
+(or (getenv "EDITOR")
+    (progn
+      (setenv "EDITOR" "emacsclient")
+      (setenv "VISUAL" (getenv "EDITOR"))))
+
+;; if PAGER is not set already, set it
+(or (getenv "PAGER")
+    (setenv "PAGER" "cat"))
+
+;; 'PATH' modifications
+
+(setq spartan-path-insert '(
+                            "~/bin"
+                            "~/.local/bin"
+                            ))
+
+(setq spartan-path-append '(
+                            ;; "~/Put/To/End/Of/PATH"
+                            ))
+
+;; Help out MacOS users to make dev env more like-linux
+;; HINT: brew install coreutils findutils gnu-tar gnu-sed gawk gnutls gnu-indent gnu-getopt grep bash
+
+(when (file-directory-p "/opt/homebrew")
+  (setq gnubin-locations
+        (split-string (shell-command-to-string "find /opt/homebrew -name \"*gnubin*\" -type d") "\n" t))
+  (add-to-list 'gnubin-locations "/opt/homebrew/bin" t)
+  (add-to-list 'gnubin-locations "/opt/homebrew/sbin" t)
+
+  (dolist (item gnubin-locations)
+    (add-to-list 'spartan-path-insert item)))
+
+;; SET matching exec-path and 'PATH' values with inserts/appends
+
+(dolist (item spartan-path-insert)
+  (add-to-list 'exec-path item))
+
+(dolist (item spartan-path-append)
+  (add-to-list 'exec-path item t))
+
+(setenv "PATH" (string-trim-right (string-join exec-path ":") ":$"))
+
+;; MACOS
+(cond ((eq system-type 'darwin)
+       (setq  mac-command-modifier        'super
+              mac-option-modifier         'meta
+              mac-right-option-modifier   'alt
+              mac-pass-control-to-system   nil)))
+
+;; UI
+
 (use-package mood-line
   :straight (:host github :repo "benjamin-asdf/mood-line")
   :config
   (setf mood-line-show-cursor-point t)
   (mood-line-mode))
 
+;; NAV
 (use-package vertico
   :init
   (vertico-mode)
@@ -189,12 +332,12 @@
   :config
   (recentf-mode t))
 
-;; Editor Functions
-(cond ((eq system-type 'darwin)
-       (setq  mac-command-modifier        'super
-              mac-option-modifier         'meta
-              mac-right-option-modifier   'alt
-              mac-pass-control-to-system   nil)))
+;; EDITOR
+(use-package markdown-mode
+  :mode ("README\\.md\\'" . gfm-mode)
+  :mode "\\.md\\'"
+  :hook ((markdown-mode . auto-fill-mode))
+  :init (setq markdown-command "multimarkdown"))
 
  (use-package  which-key
     :hook (after-init . which-key-mode)
@@ -246,7 +389,60 @@
     ;; no purpose in persisting them (Must be first in the list!)
     (add-to-list 'recentf-filename-handlers #'substring-no-properties))
 
-;; Coding Setup
+;; CODING
+
+(use-package yaml-mode
+  :mode ("\\.yml\\'" . yaml-mode)
+  :config
+  (add-hook 'yaml-mode-hook
+            '(lambda ()
+               (define-key yaml-mode-map "\C-m" 'newline-and-indent))))
+
+(use-package toml-mode
+  :mode "\\.toml\\'")
+
+(use-package bash-completion
+  :init
+  (autoload 'bash-completion-dynamic-complete
+    "bash-completion"
+    "BASH completion hook")
+  (add-hook 'shell-dynamic-complete-functions
+            #'bash-completion-dynamic-complete)
+
+  :config
+  (defun bash-completion-capf-1 (bol)
+    (bash-completion-dynamic-complete-nocomint (funcall bol) (point) t))
+  (defun bash-completion-eshell-capf ()
+    (bash-completion-capf-1 (lambda () (save-excursion (eshell-bol) (point)))))
+  (defun bash-completion-capf ()
+    (bash-completion-capf-1 #'point-at-bol))
+  (add-hook
+   'sh-mode-hook
+   (defun mm/add-bash-completion ()
+     (add-hook 'completion-at-point-functions #'bash-completion-capf nil t))))
+
+(use-package shell
+  :ensure nil
+  :config
+  (defun mm/with-current-window-buffer (f &rest args)
+    (with-current-buffer
+	(window-buffer (car (window-list)))
+      (apply f args)))
+
+  (defun mm/shell-via-async-shell-command ()
+    (switch-to-buffer
+     (window-buffer
+      (async-shell-command
+       shell-file-name))))
+
+  (advice-add #'mm/shell-via-async-shell-command :around #'mm/with-current-window-buffer)
+
+  (setf shell-kill-buffer-on-exit t)
+
+  (add-hook
+   'shell-mode-hook
+   (defun mm/shell-dont-mess-with-scroll-conservatively ()
+     (setq-local scroll-conservatively 0))))
 
 ;; (remove-hook 'find-file-hook #'vc-refresh-state)
 ;; (hook-with-delay 'find-file-hook 1 #'vc-refresh-state)
