@@ -2,7 +2,7 @@
 (setq package-enable-at-startup nil)
 
 ;;startup message
-(message "Chargement en cours early-init.el...")
+(message "!! Chargement en cours early-init.el...")
 
 ;; Garbage collection slows down startup time, so we maximise the threshold for
 ;; it to run, and we will later reset it.
@@ -41,13 +41,13 @@
 
 
 (setq-default
- initial-frame-alist '((width . 170)
-                       (height . 56)
+ initial-frame-alist '((width . 180)
+                       (height . 60)
                        (tool-bar-lines . 0)
                        (vertical-scroll-bars . 0)
                        (bottom-divider-width . 0)
                        (right-divider-width . 1)
-                       (font . "Iosevka Curly 13")
+                       (font . "Iosevka Curly Light 13")
                        )
  default-frame-alist initial-frame-alist
  frame-inhibit-implied-resize t            ;; dont resize

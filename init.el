@@ -117,6 +117,7 @@
    gnutls-min-prime-bits 2048
 
    ;; dont expire a passphrase
+   auth-sources (expand-file-name "authinfo.gpg"  "~/.config"  )
    password-cache-expiry nil
 
    mouse-yank-at-point t
@@ -691,6 +692,9 @@
       (setq magit-wip-before-change-mode t)
       (setq transient-values
             '((magit-log:magit-log-mode "--graph" "--color" "--decorate"))))
+
+(use-package forge
+  :after magit)
 
 (use-package ediff-wind
       :straight nil
