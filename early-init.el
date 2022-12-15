@@ -47,7 +47,7 @@
                        (vertical-scroll-bars . 0)
                        (bottom-divider-width . 0)
                        (right-divider-width . 1)
-                       (font . "Iosevka Curly 14")
+                       (font . "Iosevka Curly 13")
                        )
  default-frame-alist initial-frame-alist
  frame-inhibit-implied-resize t            ;; dont resize

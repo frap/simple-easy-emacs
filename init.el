@@ -86,7 +86,9 @@
 	'(read-only t cursor-intangible t face minibuffer-prompt))
   (add-hook 'minibuffer-setup-hook #'cursor-intangible-mode)
   (setq inhibit-startup-message t
-	initial-scratch-message "")
+	initial-scratch-message ";; ABANDONNEZ TOUT ESPOIR VOUS QUI ENTREZ ICI\n\n"
+	initial-major-mode #'emacs-lisp-mode)
+  
 ;;; Show matching parenthesis
   (show-paren-mode 1)
 ;;; By default, there’s a small delay before showing a matching parenthesis. Set
@@ -101,6 +103,52 @@
   (setq redisplay-skip-fontification-on-input t
 	fast-but-imprecise-scrolling t)
   (global-so-long-mode 1)
+
+  (setq-default
+   frame-resize-pixelwise t ; support better certain window managers like ratpoison
+
+   ;; these settings still should be set on a per language basis, this is just a general default
+   indent-tabs-mode nil ; spaces > tabs
+   tab-width 2 ; tab is 2 spaces
+   fill-column 79 ; python friendly
+
+   ;; better security
+   gnutls-verify-error t
+   gnutls-min-prime-bits 2048
+
+   ;; dont expire a passphrase
+   password-cache-expiry nil
+
+   mouse-yank-at-point t
+   save-interprogram-paste-before-kill t
+   apropos-do-all t
+   require-final-newline t
+   ediff-window-setup-function 'ediff-setup-windows-plain
+   
+   ;; the most reliable tramp setup I have found (used at work every day...)
+   tramp-default-method "ssh"
+   tramp-copy-size-limit nil
+   tramp-use-ssh-controlmaster-options nil
+
+   ;; I recommend the following ~/.ssh/config settings be used with the tramp settings in this cfg:
+   ;; Host *
+   ;; ForwardAgent yes
+   ;; AddKeysToAgent yes
+   ;; ControlMaster auto
+   ;; ControlPath ~/.ssh/master-%r@%h:%p
+   ;; ControlPersist yes
+   ;; ServerAliveInterval 10
+   ;; ServerAliveCountMax 10
+
+   vc-follow-symlinks t ; open symlinks, don't ask confusing questions
+
+   ring-bell-function 'ignore ; be quiet
+   )
+
+  (setq backup-directory-alist
+	`((".*" . ,temporary-file-directory)))
+  (setq auto-save-file-name-transforms
+	`((".*" ,temporary-file-directory t)))
   :bind ("<f5>" . modus-themes-toggle))
 
 ;; UNBIND ANNOYANCES
@@ -136,10 +184,7 @@
                                   (interactive)
                                   (find-file user-init-file)))
 
-(defun spartan-crux-hook ()
-  (use-package crux))
-
-(add-hook 'after-init-hook 'spartan-crux-hook)
+(use-package crux)
 
 (with-eval-after-load 'crux
   (global-set-key (kbd "C-a") 'crux-move-beginning-of-line)
@@ -202,6 +247,7 @@
 (or (getenv "PAGER")
     (setenv "PAGER" "cat"))
 
+
 ;; 'PATH' modifications
 
 (setq spartan-path-insert '(
@@ -241,15 +287,48 @@
               mac-option-modifier         'meta
               mac-right-option-modifier   'alt
               mac-pass-control-to-system   nil)))
-
+
 ;; UI
-
 (use-package mood-line
   :straight (:host github :repo "benjamin-asdf/mood-line")
   :config
   (setf mood-line-show-cursor-point t)
   (mood-line-mode))
 
+(use-package all-the-icons
+  :if (display-graphic-p)
+  :after (marginalia dired)
+  :init
+  (add-hook 'marginalia-mode #'all-the-icons-completion-marginalia-setup)
+  (add-hook 'dired-mode #'all-the-icons-dired-mode)
+  :config
+  (use-package all-the-icons-dired)
+  (use-package all-the-icons-completion)
+  :config
+  (all-the-icons-completion-mode 1))
+
+(let ((font "Iosevka Term Curly Medium 13"))
+  (add-to-list 'default-frame-alist `(font . ,font))
+  (set-face-attribute 'default t :font font :height 130)
+  (set-face-attribute 'default nil :font font :height 130)
+  (set-frame-font font nil t))
+
+(use-package default-text-scale
+  :bind (( "M--" . default-text-scale-decrease)
+         ( "M-+" . default-text-scale-increase)
+         ( "M-=" . default-text-scale-reset))
+  :config
+  (setq default-text-scale-mode 1))
+
+;; Dimm the colours of inactive windows
+(use-package dimmer
+  :config
+  (setq dimmer-fraction 0.3)
+  (setq dimmer-adjustment-mode :foreground)
+  (setq dimmer-use-colorsapce :rgb)
+  (dimmer-mode 1))
+
+
 ;; NAV
 (use-package vertico
   :init
@@ -303,6 +382,8 @@
    completion-category-overrides '((file (styles partial-completion)))))
 
 (require 'dired)
+;; better dired
+(add-hook 'dired-load-hook (function (lambda () (load "dired-x"))))
 
 ;; https://github.com/Gavinok/emacs.d
 (use-package consult
@@ -332,12 +413,138 @@
   :config
   (recentf-mode t))
 
+
 ;; EDITOR
+(use-package form-feed
+  :config (global-form-feed-mode))
+
 (use-package markdown-mode
   :mode ("README\\.md\\'" . gfm-mode)
   :mode "\\.md\\'"
   :hook ((markdown-mode . auto-fill-mode))
   :init (setq markdown-command "multimarkdown"))
+
+(use-package ob-restclient)
+
+ (use-package org
+    :straight (:type built-in)
+    :diminish t
+    :preface
+    ;; Set my default org-export backends. This variable needs to be set before
+    ;; org.el is loaded.
+    (setq org-export-backends '(ascii html latex md))
+    ;; Do not open links of mouse left clicks.
+    ;; Default behavior caused inline images in Org buffers to pop up in their
+    ;; own buffers when left clicked on by mistake. I can still intentionally
+    ;; open links and such images in new buffers by doing C-c C-o.
+    (setq org-mouse-1-follows-link nil)
+    :bind (("C-c c" . org-capture)
+	   ("C-c a" . org-agenda)
+	   ("<f7> s" . org-store-link)
+	   :map org-src-mode-map
+	   ("C-x w" . org-edit-src-exit)
+	   ("C-x C-s" . org-edit-src-exit))
+    :mode ("\\.org\\'" . org-mode)
+    :custom-face
+    (org-block ((t (:extend t))))
+    (org-block-begin-line ((t ( :slant unspecified
+				:weight normal
+				:background unspecified
+				:inherit org-block
+				:extend t))))
+    (org-block-end-line ((t ( :slant unspecified
+			      :weight normal
+			      :background unspecified
+			      :inherit org-block-begin-line
+			      :extend t))))
+    (org-drawer ((t (:foreground nil :inherit shadow))))
+    :custom
+    (org-ellipsis "…")
+    :init
+    ;; This is where my ~heart~ org files are.
+    (setq org-directory "~/logseq")
+    :config
+    (require 'ob-restclient)
+    ;;;; general settings
+    (setq org-adapt-indentation nil)      ; No, non, nein, όχι!
+    ;; Prevent auto insertion of blank lines before headings and list items
+    (setq org-blank-before-new-entry '((heading)
+				       (plain-list-item)))
+    (setq org-structure-template-alist    ; CHANGED in Org 9.3, Emacs 27.1
+	  '(("s" . "src")
+	    ("E" . "src emacs-lisp")
+	    ("e" . "example")
+	    ("q" . "quote")
+	    ("v" . "verse")
+	    ("V" . "verbatim")
+	    ("c" . "center")
+	    ("C" . "comment")))
+    (setq org-catch-invisible-edits 'smart) ;; try not to accidently do wierd stuff in invisible regions : show smart, error
+    (setq org-return-follows-link t)
+
+     ;; Allow _ and ^ characters to sub/super-script strings but only when
+    ;; string is wrapped in braces
+    (setq org-use-sub-superscripts '{}) ; In-buffer rendering
+    (setq org-pretty-entities t)        ; special symbols, latex
+    ;; Render subscripts and superscripts in Org buffers
+    (setq org-pretty-entities-include-sub-superscripts t)
+    (setq org-insert-heading-respect-content t)
+
+    ;;;; code blocks
+    (setq org-hide-block-startup nil)
+    (setq org-fontify-quote-and-verse-blocks t
+	  org-fontify-whole-heading-line t)
+    (setq org-confirm-babel-evaluate nil)
+    (setq org-src-window-setup 'current-window)
+    (setq org-edit-src-persistent-message nil)
+    (setq org-src-fontify-natively t) ;; Display entities like \tilde, \alpha, etc in UTF-8 characters
+    (setq org-src-preserve-indentation t)
+    (setq org-src-tab-acts-natively t) ;; TAB as if code tab settings
+    (setq org-edit-src-content-indentation 0) ;; remove 2 space indent in src code blocks
+    (setq org-use-property-inheritance t) ;; for tangling
+
+    ;; https://orgmode.org/manual/Clean-view.html
+    (setq org-startup-indented t)       ;;; removed leading * for nicer view
+    (with-eval-after-load 'org-indent
+      (setq org-indent-indentation-per-level 1)) ;Default = 2
+
+    (org-babel-do-load-languages
+     'org-babel-load-languages
+     '((emacs-lisp . t)
+       (clojure . t)
+       (shell . t)
+       (R . t)
+       (lisp . t)
+       (sqlite . t)
+       (python . t)
+       (latex . t)
+       (restclient . t)
+       ))
+     (define-advice org-return (:around (f &rest args))
+      (let ((org-src-preserve-indentation t))
+	(apply f args)))
+    (define-advice org-cycle (:around (f &rest args))
+      (let ((org-src-preserve-indentation t))
+	(apply f args)))
+    (defun org-babel-edit-prep:emacs-lisp (_)
+      "Setup Emacs Lisp buffer for Org Babel."
+      (setq lexical-binding t)
+      (setq-local flycheck-disabled-checkers '(emacs-lisp-checkdoc)))
+    (defun gas/org-setup ()
+    ;;  (org-indent-mode)       ;; turn on org indent
+      (variable-pitch-mode 1) ;; turn on variable-pitch
+      (auto-fill-mode +1)      ;; turn on auto-fill
+      (visual-line-mode 1)    ;; turn on visual-line-mode
+     ;; (show-paren-mode 1)     ;; show parentheses
+      (hl-line-mode +1)
+      (auto-fill-mode +1)
+      (whitespace-mode -1)
+      (electric-indent-local-mode -1)
+      (setq-local cursor-type 'bar)
+      (setq-local delete-trailing-lines t)
+      (add-hook 'before-save-hook #'delete-trailing-whitespace nil t)
+      )
+    )
 
  (use-package  which-key
     :hook (after-init . which-key-mode)
@@ -557,14 +764,22 @@
   ;; Ensure file templates in `file-templates-dir' are visible
   (yas-reload-all))
 
-(use-package restclient)
+(use-package json-mode
+  :ensure t)
+
+(use-package restclient
+  :mode (("\\.http\\'" . restclient-mode))
+  :bind (:map restclient-mode-map
+	      ("C-c C-f" . json-mode-beautify)))
+
+(use-package restclient-jq)
 
 (use-package js2-mode
   :ensure t
   :init
   (setq js-basic-indent 2)
   (setq-default js2-basic-indent 2
-                js2-basic-offset 2
+                js2-indent-level 2
                 js2-auto-indent-p t
                 js2-cleanup-whitespace t
                 js2-enter-indents-newline t
@@ -580,7 +795,38 @@
 (use-package color-identifiers-mode
     :ensure t
     :init
-      (add-hook 'js2-mode-hook 'color-identifiers-mode))
+    (add-hook 'js2-mode-hook 'color-identifiers-mode))
+
+(use-package paredit)
+
+;; paredit everywhere
+(defun spartan-lisp-hook ()
+  (require 'paredit)
+  (add-hook 'emacs-lisp-mode-hook       #'enable-paredit-mode)
+  (add-hook 'eval-expression-minibuffer-setup-hook #'enable-paredit-mode)
+  (add-hook 'ielm-mode-hook             #'enable-paredit-mode)
+  (add-hook 'lisp-mode-hook             #'enable-paredit-mode)
+  (add-hook 'lisp-interaction-mode-hook #'enable-paredit-mode)
+  (add-hook 'clojure-mode-hook          #'enable-paredit-mode)
+  (add-hook 'scheme-mode-hook           #'enable-paredit-mode)
+  (add-hook 'racket-mode-hook           #'enable-paredit-mode)
+
+  ;; Clojure
+  (with-eval-after-load 'eglot
+      (add-to-list 'eglot-server-programs
+                   `(clojure-mode . ("clojure-lsp"))))
+
+  (when (executable-find "clojure-lsp")
+    (with-eval-after-load 'eglot
+      (add-hook 'clojure-mode-hook 'eglot-ensure)))
+
+  (add-hook 'clojure-mode-hook
+            (lambda ()
+              (define-key clojure-mode-map (kbd "M-m rr") 'inf-clojure-eval-region)
+              (define-key clojure-mode-map (kbd "M-m rb") 'inf-clojure-eval-buffer)
+              (define-key clojure-mode-map (kbd "M-m rR") 'inf-clojure))))
+
+(add-hook 'after-init-hook 'spartan-lisp-hook)
 
 (use-package cider
   :config
@@ -609,20 +855,20 @@
 
 (advice-add #'cider-jack-in-global-options :around #'corgi/around-cider-jack-in-global-options)
 
-  (defun simple-easy-clojure-hello ()
-    (interactive)
-    (unless
-	(executable-find "clj")
-      (user-error
-       "Install clojure first! browsing to %s"
-       (let ((url "https://clojure.org/guides/install_clojure")) (browse-url url) url)))
-    (let*
-	((dir (expand-file-name "simple-easy-clojure-hello" (temporary-file-directory)))
+(defun simple-easy-clojure-hello ()
+  (interactive)
+  (unless
+      (executable-find "clj")
+    (user-error
+     "Install clojure first! browsing to %s"
+     (let ((url "https://clojure.org/guides/install_clojure")) (browse-url url) url)))
+  (let*
+      ((dir (expand-file-name "simple-easy-clojure-hola" (temporary-file-directory)))
 	 (_ (make-directory dir t))
 	 (default-directory dir))
       (shell-command "echo '{}' > deps.edn")
       (make-directory "src" t)
-      (find-file "src/hello.clj")
+      (find-file "src/hola.clj")
       (when (eq (point-min) (point-max))
-	(insert "(ns hello)\n\n(defn main []\n  (println \"hello world\"))\n\n\n;; this is a Rich comment, use it to try out pieces of code while you develop.\n(comment\n  (def rand-num (rand-int 10))\n  (println \"Here is the secret number: \" rand-num))"))
+	(insert "(ns hola)\n\n(defn main []\n  (println \"hola pelotudo\"))\n\n\n;; this is a Rich comment, use it to try out pieces of code while you develop.\n(comment\n  (def rand-num (rand-int 10))\n  (println \"Here is the secret number: \" rand-num))"))
       (call-interactively #'cider-jack-in-clj))))
